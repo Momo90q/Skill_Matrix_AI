@@ -1,0 +1,6 @@
+Topic: Machine Learning Fundamentals and Evaluation
+Bias-Variance Tradeoff: High bias leads to underfitting because the model is too simple to capture patterns. High variance leads to overfitting because the model memorizes training noise and fails to generalize to unseen test data.
+Evaluation Metrics:
+- Precision: Measures the proportion of true positive predictions among all positive predictions made by the model. Critical when false positives are costly (e.g., spam detection).
+- Recall: Measures the proportion of true positives identified out of all actual positive instances. Critical when false negatives are dangerous (e.g., cancer diagnosis).
+- F1-Score: Harmonic mean of precision and recall.

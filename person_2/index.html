@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Technical Virtual Interview</title>
+    <!-- MediaPipe Face Detection for Client-side Proctoring -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/face_detection.js" crossorigin="anonymous"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: #0f172a; 
+            color: #f8fafc; 
+            margin: 0; 
+            padding: 24px; 
+        }
+        .container { 
+            max-width: 960px; 
+            margin: 0 auto; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 16px; 
+            padding-bottom: 120px;
+        }
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            border-bottom: 1px solid #334155; 
+            padding-bottom: 16px; 
+        }
+        .badge { 
+            background: #3b82f6; 
+            color: white; 
+            padding: 6px 14px; 
+            border-radius: 999px; 
+            font-size: 14px; 
+            font-weight: 600; 
+        }
+        .stats-bar { 
+            display: flex; 
+            gap: 20px; 
+            background: #1e293b; 
+            padding: 12px 18px; 
+            border-radius: 6px; 
+            border: 1px solid #334155; 
+            font-size: 14px; 
+        }
+        .chat-box { 
+            background: #1e293b; 
+            border-radius: 8px; 
+            padding: 20px; 
+            min-height: 380px; 
+            max-height: 480px; 
+            overflow-y: auto; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 14px; 
+            border: 1px solid #334155; 
+        }
+        .msg { 
+            padding: 12px 16px; 
+            border-radius: 8px; 
+            max-width: 85%; 
+            line-height: 1.5; 
+            font-size: 15px; 
+        }
+        .interviewer { background: #0284c7; color: white; align-self: flex-start; }
+        .candidate { background: #334155; color: #f8fafc; align-self: flex-end; }
+        .feedback { background: #164e63; border-left: 4px solid #06b6d4; align-self: stretch; font-size: 14px; }
+        .input-row { display: flex; gap: 10px; }
+        textarea { 
+            flex: 1; 
+            padding: 12px; 
+            border-radius: 6px; 
+            border: 1px solid #475569; 
+            background: #1e293b; 
+            color: white; 
+            font-family: inherit; 
+            font-size: 14px; 
+            resize: vertical; 
+        }
+        .code-input { 
+            font-family: "Fira Code", monospace; 
+            background: #090d16; 
+            border-color: #3b82f6; 
+            min-height: 200px; 
+        }
+        select { 
+            background: #1e293b; 
+            color: white; 
+            border: 1px solid #475569; 
+            padding: 8px 12px; 
+            border-radius: 6px; 
+            font-weight: 500; 
+        }
+        button { 
+            background: #2563eb; 
+            color: white; 
+            border: none; 
+            padding: 12px 24px; 
+            border-radius: 6px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: background 0.2s; 
+        }
+        button:hover { background: #1d4ed8; }
+        .btn-voice { background: #dc2626; }
+        .btn-voice:hover { background: #b91c1c; }
+        
+        /* Floating Webcam Proctoring Box */
+        #videoContainer { 
+            position: fixed; 
+            bottom: 20px; 
+            right: 20px; 
+            width: 240px; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            border: 2px solid #3b82f6; 
+            background: #000; 
+            z-index: 1000; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5); 
+        }
+        #webcam { 
+            width: 100%; 
+            display: block; 
+            transform: scaleX(-1); 
+        }
+        #proctorWarning { 
+            display: none; 
+            background: rgba(220, 38, 38, 0.95); 
+            color: white; 
+            padding: 6px; 
+            font-size: 11px; 
+            text-align: center; 
+            font-weight: bold; 
+        }
+
+        /* Final Report Card */
+        .report-card { 
+            background: #0b1e36; 
+            border: 2px solid #38bdf8; 
+            border-radius: 10px; 
+            padding: 24px; 
+            width: 100%; 
+            box-sizing: border-box; 
+        }
+        .score-grid { 
+            display: grid; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 14px; 
+            margin: 16px 0; 
+        }
+        .score-box { 
+            background: #1e293b; 
+            padding: 14px; 
+            border-radius: 8px; 
+            text-align: center; 
+            border: 1px solid #334155; 
+        }
+        .score-val { 
+            font-size: 24px; 
+            font-weight: 700; 
+            color: #38bdf8; 
+            margin-top: 6px; 
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h2>AI Technical Interview Engine</h2>
+        <span id="roundBadge" class="badge">Round 1: Aptitude & Core CSE</span>
+    </div>
+
+    <div class="stats-bar">
+        <span><strong>Difficulty:</strong> <span id="diffLevel">1</span>/5</span>
+        <span><strong>Questions Answered:</strong> <span id="qCount">0</span></span>
+        <span><strong>Avg Score:</strong> <span id="avgScore">--</span></span>
+        <span><strong>Face Proctor:</strong> <span id="proctorStatus" style="color: #10b981;">1 Person Verified</span></span>
+    </div>
+
+    <div id="chatBox" class="chat-box"></div>
+
+    <!-- Text Input Area (Round 1) -->
+    <div id="textInputArea" class="input-row">
+        <textarea id="answerInput" rows="3" placeholder="Type your answer here..."></textarea>
+        <button id="sendBtn" onclick="submitAnswer()">Submit Answer</button>
+    </div>
+
+    <!-- Multi-Language Code Editor (Round 2) -->
+    <div id="codeInputArea" style="display: none; flex-direction: column; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label>Select Language:
+                <select id="langSelect" onchange="onLanguageChange()">
+                    <option value="python">Python</option>
+                    <option value="javascript">JavaScript</option>
+                    <option value="java">Java</option>
+                    <option value="cpp">C++</option>
+                </select>
+            </label>
+            <span style="font-size: 13px; color: #94a3b8;">*Evaluated against hidden test patterns and complexity</span>
+        </div>
+        <textarea id="codeAnswerInput" class="code-input" rows="10"></textarea>
+        <button onclick="submitCode()" style="align-self: flex-end;">Run & Submit Solution</button>
+    </div>
+
+    <!-- Voice Control Area (Round 3) -->
+    <div id="voiceInputArea" style="display: none; flex-direction: column; gap: 10px; background: #1e293b; padding: 16px; border-radius: 8px; border: 1px solid #334155;">
+        <p style="margin: 0; font-size: 14px; color: #cbd5e1;">
+            <strong>Virtual Defense Mode:</strong> The interviewer speaks aloud. Answer directly into your microphone.
+        </p>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <button id="recordBtn" class="btn-voice" onclick="toggleRecording()">Start Speaking Answer</button>
+            <span id="recordingStatus" style="font-size: 13px; color: #94a3b8;">Microphone Ready</span>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Webcam Box for Proctoring -->
+<div id="videoContainer">
+    <video id="webcam" autoplay playsinline muted></video>
+    <div id="proctorWarning">VIOLATION DETECTED</div>
+</div>
+
+<script>
+    const sessionId = "cand_" + Math.floor(Math.random() * 10000);
+    const ws = new WebSocket(`ws://${window.location.host}/ws/interview/${sessionId}`);
+    const chatBox = document.getElementById("chatBox");
+    let currentRound = 1;
+    let codeTemplates = {};
+    let scores = [];
+
+    // ================= 1. WEBSOCKET COMMUNICATIONS =================
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+
+        if (data.event === "new_question") {
+            appendMessage("interviewer", `<strong>Interviewer:</strong> ${data.question}`);
+            if (data.difficulty) document.getElementById("diffLevel").innerText = data.difficulty;
+            speakInterviewerQuestion(data.question);
+        } 
+        else if (data.event === "evaluation_result") {
+            scores.push(data.score);
+            const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
+            document.getElementById("avgScore").innerText = avg + "/10";
+            document.getElementById("qCount").innerText = scores.length;
+            appendMessage("feedback", `<strong>Score:</strong> ${data.score}/10<br><strong>Feedback:</strong>${data.feedback}`);
+        }
+        else if (data.event === "round_transition") {
+            currentRound = data.next_round;
+            const gate = data.gate_status;
+            document.getElementById("roundBadge").innerText = gate.round_name;
+            appendMessage("feedback", `<strong>GATEKEEPER:</strong> ${gate.feedback_summary}`);
+
+            if (currentRound === 2 && data.challenge) {
+                codeTemplates = data.challenge.templates;
+                document.getElementById("textInputArea").style.display = "none";
+                document.getElementById("voiceInputArea").style.display = "none";
+                document.getElementById("codeInputArea").style.display = "flex";
+                document.getElementById("codeAnswerInput").value = codeTemplates["python"];
+                appendMessage("interviewer", `<strong>Round 2: ${data.challenge.title}</strong><br>${data.challenge.description}`);
+            } 
+            else if (currentRound === 3) {
+                document.getElementById("codeInputArea").style.display = "none";
+                document.getElementById("textInputArea").style.display = "none";
+                document.getElementById("voiceInputArea").style.display = "flex";
+
+                if (data.code_feedback) {
+                    appendMessage("feedback", `<strong>Code Assessment:</strong> Time: ${data.code_feedback.time_complexity} \vert{} Space:${data.code_feedback.space_complexity}<br><strong>Hidden Patterns Handled:</strong> ${data.code_feedback.passed_hidden_patterns ? 'Yes' : 'No'}<br>${data.code_feedback.hidden_pattern_feedback}`);
+                }
+                if (data.question) {
+                    appendMessage("interviewer", `<strong>Round 3 Defense Challenge:</strong> ${data.question}`);
+                    speakInterviewerQuestion(data.question);
+                }
+            }
+        }
+        else if (data.event === "defense_challenge") {
+            appendMessage("interviewer", `<strong>Interviewer Critique:</strong> ${data.question}`);
+            speakInterviewerQuestion(data.question);
+        }
+        else if (data.event === "interview_complete") {
+            document.getElementById("textInputArea").style.display = "none";
+            document.getElementById("codeInputArea").style.display = "none";
+            document.getElementById("voiceInputArea").style.display = "none";
+            renderFinalReport(data.report);
+        }
+    };
+
+    function appendMessage(type, html) {
+        const div = document.createElement("div");
+        div.className = `msg ${type}`;
+        div.innerHTML = html;
+        chatBox.appendChild(div);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    // ================= 2. USER ACTION SUBMISSIONS =================
+    function submitAnswer() {
+        const input = document.getElementById("answerInput");
+        const text = input.value.trim();
+        if (!text) return;
+
+        appendMessage("candidate", `<strong>You:</strong> ${text}`);
+        ws.send(JSON.stringify({ action: "submit_answer", text: text }));
+        input.value = "";
+    }
+
+    function onLanguageChange() {
+        const lang = document.getElementById("langSelect").value;
+        if (codeTemplates[lang]) {
+            document.getElementById("codeAnswerInput").value = codeTemplates[lang];
+        }
+    }
+
+    function submitCode() {
+        const lang = document.getElementById("langSelect").value;
+        const code = document.getElementById("codeAnswerInput").value.trim();
+        if (!code) return;
+
+        appendMessage("candidate", `<strong>Submitted (${lang.toUpperCase()}):</strong><pre><code>${code}</code></pre>`);
+        ws.send(JSON.stringify({ action: "submit_code", code: code, language: lang }));
+    }
+
+    // ================= 3. TEXT-TO-SPEECH (INTERVIEWER VOICE) =================
+    function speakInterviewerQuestion(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const cleanText = text.replace(/[*_#`]/g, '');
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            
+            const voices = window.speechSynthesis.getVoices();
+            const engVoice = voices.find(v => v.lang.includes('en'));
+            if (engVoice) utterance.voice = engVoice;
+
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    // ================= 4. SPEECH RECORDING (CANDIDATE VOICE) =================
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
+
+    async function toggleRecording() {
+        const recordBtn = document.getElementById("recordBtn");
+        const statusSpan = document.getElementById("recordingStatus");
+
+        if (!isRecording) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    statusSpan.innerText = "Transcribing speech...";
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(audioBlob);
+                    reader.onloadend = () => {
+                        const base64Audio = reader.result.split(',')[1];
+                        appendMessage("candidate", "<em>Spoken voice answer submitted.</em>");
+                        ws.send(JSON.stringify({ action: "submit_answer", audio_base64: base64Audio }));
+                        statusSpan.innerText = "Microphone Ready";
+                    };
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordBtn.innerText = "Stop & Submit Answer";
+                statusSpan.innerText = "Listening... Speak your defense clearly.";
+                statusSpan.style.color = "#ef4444";
+            } catch (err) {
+                alert("Microphone access denied or unavailable.");
+            }
+        } else {
+            mediaRecorder.stop();
+            isRecording = false;
+            recordBtn.innerText = "Start Speaking Answer";
+            statusSpan.style.color = "#94a3b8";
+        }
+    }
+
+    // ================= 5. FACE PROCTORING (MEDIAPIPE) =================
+    const videoElement = document.getElementById('webcam');
+    const proctorWarning = document.getElementById('proctorWarning');
+    const proctorStatus = document.getElementById('proctorStatus');
+    let multiPersonViolationFrames = 0;
+
+    const faceDetection = new FaceDetection({
+        locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_detection/${file}`
+    });
+
+    faceDetection.setOptions({
+        model: 'short',
+        minDetectionConfidence: 0.65
+    });
+
+    faceDetection.onResults((results) => {
+        const faceCount = results.detections ? results.detections.length : 0;
+
+        if (faceCount > 1) {
+            proctorWarning.style.display = "block";
+            proctorWarning.innerText = `VIOLATION: ${faceCount} PEOPLE DETECTED!`;
+            proctorStatus.innerText = "Violation (Multiple People)";
+            proctorStatus.style.color = "#ef4444";
+            multiPersonViolationFrames++;
+
+            if (multiPersonViolationFrames > 8) {
+                alert("INTERVIEW TERMINATED: Multiple people detected in camera frame. Compliance violated.");
+                window.location.reload();
+            }
+        } else if (faceCount === 0) {
+            proctorWarning.style.display = "block";
+            proctorWarning.innerText = "WARNING: No face detected!";
+            proctorStatus.innerText = "Warning (No Face)";
+            proctorStatus.style.color = "#eab308";
+        } else {
+            proctorWarning.style.display = "none";
+            proctorStatus.innerText = "1 Person Verified";
+            proctorStatus.style.color = "#10b981";
+            multiPersonViolationFrames = 0;
+        }
+    });
+
+    const camera = new Camera(videoElement, {
+        onFrame: async () => {
+            await faceDetection.send({ image: videoElement });
+        },
+        width: 320,
+        height: 240
+    });
+    camera.start();
+
+    // ================= 6. FINAL PERFORMANCE REPORT =================
+    function renderFinalReport(report) {
+        const cardHtml = `
+            <div class="report-card">
+                <h2 style="margin-top:0; color:#38bdf8;">Candidate Final Performance Report</h2>
+                <p><strong>Candidate ID:</strong> ${report.session_id} | <strong>Role:</strong> ${report.role}</p>
+                <div class="score-grid">
+                    <div class="score-box">
+                        <div>Round 1 (Aptitude & CSE)</div>
+                        <div class="score-val">${report.section_scores.round_1_concepts}/10</div>
+                    </div>
+                    <div class="score-box">
+                        <div>Round 2 (Coding & Patterns)</div>
+                        <div class="score-val">${report.section_scores.round_2_coding}/10</div>
+                    </div>
+                    <div class="score-box">
+                        <div>Round 3 (Virtual Defense)</div>
+                        <div class="score-val">${report.section_scores.round_3_system_defense}/10</div>
+                    </div>
+                </div>
+                <div style="background:#1e293b; padding:16px; border-radius:8px; border:1px solid #334155;">
+                    <p style="margin:0 0 6px 0;"><strong>Overall Score:</strong> <span style="font-size:20px; color:#10b981; font-weight:700;">${report.overall_score}/10</span></p>
+                    <p style="margin:0; font-size:14px; color:#cbd5e1;"><strong>Hidden Patterns Tested:</strong> ${report.coding_breakdown.hidden_pattern_feedback || 'Edge cases evaluated'}</p>
+                </div>
+            </div>
+        `;
+        appendMessage("candidate", cardHtml);
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+Topic: Database Indexing and Transactions
+Index Types: B-Trees and B+ Trees are standard for relational database indexes. B+ Trees keep all actual data pointers in leaf nodes connected by a linked list, which makes range queries significantly faster than standard B-Trees.
+ACID Properties:
+- Atomicity: Guarantees that all operations within a transaction complete successfully or are completely rolled back.
+- Consistency: Ensures that transactions bring the database from one valid state to another, maintaining all schema constraints.
+- Isolation: Determines how transaction integrity is visible to other concurrent users. Isolation levels include Read Uncommitted, Read Committed, Repeatable Read, and Serializable.
+- Durability: Guarantees that once a transaction has been committed, it remains committed even in the event of a system crash.

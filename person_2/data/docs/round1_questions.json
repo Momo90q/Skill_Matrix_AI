@@ -1,0 +1,20 @@
+[
+  {
+    "category": "Quantitative Aptitude",
+    "question": "A train running at the speed of 60 km/hr crosses a pole in 9 seconds. What is the length of the train in meters?",
+    "ideal_keywords": ["150", "distance = speed * time", "5/18"],
+    "solution_summary": "Speed = 60 * (5/18) = 50/3 m/s. Length = (50/3) * 9 = 150 meters."
+  },
+  {
+    "category": "Core CSE - OS",
+    "question": "What are the four necessary conditions for a deadlock to occur in an operating system?",
+    "ideal_keywords": ["mutual exclusion", "hold and wait", "no preemption", "circular wait"],
+    "solution_summary": "Mutual exclusion, Hold and wait, No preemption, and Circular wait."
+  },
+  {
+    "category": "Core CSE - DBMS",
+    "question": "Explain the difference between 2NF and 3NF in database normalization.",
+    "ideal_keywords": ["partial dependency", "transitive dependency", "candidate key"],
+    "solution_summary": "2NF removes partial dependency on a candidate key, while 3NF removes transitive dependencies."
+  }
+]
