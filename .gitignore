@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+
+# ML checkpoints and models
+**/checkpoint-*/
+*.pt
+*.pth
+*.safetensors
+*.h5
+*.onnx
+
+# Generated databases
+**/dsa_database.db
+**/chroma.sqlite3
+
+# Joblib models
+*.joblib
+
+# Environment/secrets
+.env
+.env.*
+
+# Jupyter
+.ipynb_checkpoints/
