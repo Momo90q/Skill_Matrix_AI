@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from engine.orchestrator import InterviewOrchestrator
 from engine.schemas import CandidateSession
+from api.practice import router as practice_router
 
 env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(dotenv_path=env_path)
@@ -24,25 +25,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-orchestrator = InterviewOrchestrator(passing_score_threshold=6.0)
+app.include_router(practice_router)
 
-# Multi-language templates & hidden constraints for Round 2
-DSA_CHALLENGE = {
-    "title": "Two Sum (Target Pair Detection)",
-    "description": "Given an array of integers `nums` and an integer `target`, return the indices of the two numbers such that they add up to `target`.",
-    "hidden_patterns": """
-    - Pattern 1: Negative numbers and zero (e.g., nums=[-3, 4, 3, 90], target=0).
-    - Pattern 2: Duplicate values completing target (e.g., nums=[3, 3], target=6 -> must not reuse same index).
-    - Pattern 3: Large arrays requiring O(n) hash map time complexity; O(n^2) nested loops should receive lower score.
-    - Pattern 4: No valid solution found (return empty list or appropriate null indicator).
-    """,
-    "templates": {
-        "python": "def two_sum(nums: list[int], target: int) -> list[int]:\n    # Write your O(n) solution here\n    pass",
-        "javascript": "function twoSum(nums, target) {\n    // Write your solution here\n    return [];\n}",
-        "java": "class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        // Write your solution here\n        return new int[]{};\n    }\n}",
-        "cpp": "#include <vector>\n#include <unordered_map>\n\nstd::vector<int> twoSum(std::vector<int>& nums, int target) {\n    // Write your solution here\n    return {};\n}"
-    }
-}
+orchestrator = InterviewOrchestrator(passing_score_threshold=6.0)
 
 active_sessions: dict[str, dict] = {}
 
@@ -62,13 +47,13 @@ async def interview_ws_endpoint(websocket: WebSocket, session_id: str):
             "round_1_scores": [],
             "round_2_score": 0,
             "round_2_details": {},
-            "round_3_scores": []
+            "round_3_scores": [],
+            "current_challenge": None
         }
     
     session_data = active_sessions[session_id]
     session: CandidateSession = session_data["session"]
 
-    # Initial Round 1 question
     first_question = orchestrator.engine.generate_question(session, topic="Database Indexing and Transactions")
     await websocket.send_json({
         "event": "new_question",
@@ -101,14 +86,19 @@ async def interview_ws_endpoint(websocket: WebSocket, session_id: str):
                     gate_status = orchestrator.evaluate_round_1_transition(session)
                     if gate_status.passed_gate:
                         session_data["round"] = 2
+                        challenge = orchestrator.get_next_challenge()
+                        session_data["current_challenge"] = challenge
                         await websocket.send_json({
                             "event": "round_transition",
                             "gate_status": gate_status.model_dump(),
                             "next_round": 2,
                             "challenge": {
-                                "title": DSA_CHALLENGE["title"],
-                                "description": DSA_CHALLENGE["description"],
-                                "templates": DSA_CHALLENGE["templates"]
+                                "title": challenge["title"],
+                                "description": challenge["description"],
+                                "difficulty": challenge["difficulty"],
+                                "topics": challenge["topics"],
+                                "test_cases": challenge["test_cases"],
+                                "templates": challenge["templates"]
                             }
                         })
                 else:
@@ -125,14 +115,19 @@ async def interview_ws_endpoint(websocket: WebSocket, session_id: str):
             elif session_data["round"] == 2 and action == "submit_code":
                 code = payload.get("code", "")
                 language = payload.get("language", "python")
+                challenge = session_data["current_challenge"]
 
-                # Judge code against hidden test patterns
-                code_eval = orchestrator.evaluate_code_solution(DSA_CHALLENGE, code, language)
+                code_eval = orchestrator.evaluate_code_solution(
+                    challenge, code, language,
+                    candidate_elo=1200,
+                    candidate_topic_skill=0.0,
+                    hints_used=0,
+                    time_spent_seconds=600
+                )
                 session_data["round_2_score"] = code_eval.score
                 session_data["round_2_details"] = code_eval.model_dump()
                 session_data["round"] = 3
 
-                # Round 3 starter question
                 system_design_challenge = "Design an end-to-end vector search architecture for 10 million embeddings with sub-50ms latency. Describe your database, indexing strategy, and caching layers."
                 session.current_question = system_design_challenge
 
@@ -154,7 +149,6 @@ async def interview_ws_endpoint(websocket: WebSocket, session_id: str):
                 design_answer = payload.get("text", "")
                 
                 if len(session_data["round_3_scores"]) < 1:
-                    # Provide devil's advocate challenge
                     session_data["round_3_scores"].append(8)
                     defense_critique = orchestrator.generate_round_3_defense_prompt(session, design_answer)
                     session.current_question = defense_critique
@@ -163,7 +157,6 @@ async def interview_ws_endpoint(websocket: WebSocket, session_id: str):
                         "question": defense_critique
                     })
                 else:
-                    # Final submission; compute individual section scores and overall average
                     session_data["round_3_scores"].append(8)
 
                     r1_avg = sum(session_data["round_1_scores"]) / len(session_data["round_1_scores"])
@@ -190,8 +183,18 @@ async def interview_ws_endpoint(websocket: WebSocket, session_id: str):
         print(f"Session {session_id} disconnected.")
 
 @app.get("/", response_class=HTMLResponse)
+async def serve_home_ui():
+    html_file = Path(__file__).resolve().parent / "home.html"
+    return html_file.read_text(encoding="utf-8")
+
+@app.get("/interview", response_class=HTMLResponse)
 async def serve_interview_ui():
     html_file = Path(__file__).resolve().parent / "index.html"
+    return html_file.read_text(encoding="utf-8")
+
+@app.get("/practice", response_class=HTMLResponse)
+async def serve_practice_ui():
+    html_file = Path(__file__).resolve().parent / "practice.html"
     return html_file.read_text(encoding="utf-8")
 
 if __name__ == "__main__":
